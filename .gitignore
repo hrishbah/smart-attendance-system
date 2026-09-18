@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+backend/deps/
+backend/uploads/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Environment
+.env
+.env.local
+
+# Uploads
+backend/uploads/
+backend/static/photos/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Database
+*.db
+
+# Logs
+*.log
+
+# Broken Git metadata backup
+.git-broken-backup/
