@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2, Eye, Camera } from 'lucide-react';
-import { api, Student } from '../api/client';
+import { api, Student, UPLOAD_URL } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -97,7 +97,7 @@ export default function StudentsPage() {
               <tr key={s.id} className="border-t border-gray-100 dark:border-gray-700">
                 <td className="px-4 py-3">
                   {s.profile_photo ? (
-                    <img src={`/uploads/${s.profile_photo}`} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    <img src={`${UPLOAD_URL}/${s.profile_photo}`} alt="" className="w-10 h-10 rounded-full object-cover" />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-bold">
                       {s.full_name.charAt(0)}

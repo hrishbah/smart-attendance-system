@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api, StudentProfile } from '../api/client';
+import { api, StudentProfile, UPLOAD_URL } from '../api/client';
 
 export default function StudentProfilePage() {
   const { id } = useParams();
@@ -17,7 +17,7 @@ export default function StudentProfilePage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="bg-white dark:bg-gray-800 rounded-xl border p-6 flex flex-col sm:flex-row gap-6">
         {s.profile_photo ? (
-          <img src={`/uploads/${s.profile_photo}`} alt="" className="w-32 h-32 rounded-xl object-cover" />
+          <img src={`${UPLOAD_URL}/${s.profile_photo}`} alt="" className="w-32 h-32 rounded-xl object-cover" />
         ) : (
           <div className="w-32 h-32 rounded-xl bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-4xl font-bold">{s.full_name.charAt(0)}</div>
         )}

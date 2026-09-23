@@ -25,6 +25,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+export const UPLOAD_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/uploads` : '/uploads';
+
 export const api = {
   login: (email: string, password: string) =>
     request<{ role: string; name: string; email: string }>('/auth/login', {
