@@ -151,58 +151,107 @@ def export_excel(
     )
 
 
-@router.get("/reports/export/pdf")
-def export_pdf(
-    report_type: str = Query("daily"),
-    subject_id: Optional[int] = None,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.FACULTY)),
-):
+def _build_attendance_pdf(data, report_type):
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    data = attendance_report(report_type=report_type, subject_id=subject_id, db=db, user=user)
+
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=letter,
-                            rightMargin=0.5*inch, leftMargin=0.5*inch,
-                            topMargin=0.6*inch, bottomMargin=0.6*inch)
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=letter,
+        rightMargin=0.5 * inch,
+        leftMargin=0.5 * inch,
+        topMargin=0.6 * inch,
+        bottomMargin=0.6 * inch,
+    )
     styles = getSampleStyleSheet()
+    compact_header = ParagraphStyle(
+        "compact_header",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8.5,
+        leading=10,
+        textColor=colors.whitesmoke,
+    )
+    compact_body = ParagraphStyle(
+        "compact_body",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7,
+        leading=8,
+    )
+    empty_msg = ParagraphStyle(
+        "empty_msg",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=14,
+    )
+
     story = []
-    story.append(Paragraph(f"<b>Attendance Report - {report_type.title()}</b>", styles['Title']))
-    story.append(Spacer(1, 0.15*inch))
-    headers = [Paragraph("<b>Student Name</b>", styles['Normal']), Paragraph("<b>Roll No</b>", styles['Normal']), Paragraph("<b>Subject</b>", styles['Normal']), Paragraph("<b>Date</b>", styles['Normal']), Paragraph("<b>Time</b>", styles['Normal']), Paragraph("<b>Status</b>", styles['Normal']), Paragraph("<b>Confidence</b>", styles['Normal'])]
-    rows = [headers]
-    for r in data["records"][:50]:
-        rows.append([
-            Paragraph(str(r.get("student_name") or ""), styles['Normal']),
-            Paragraph(str(r.get("roll_number") or ""), styles['Normal']),
-            Paragraph(str(r.get("subject") or ""), styles['Normal']),
-            Paragraph(str(r.get("date") or ""), styles['Normal']),
-            Paragraph(str(r.get("time") or ""), styles['Normal']),
-            Paragraph(str(r.get("status") or ""), styles['Normal']),
-            Paragraph(str(r.get("confidence") if r.get("confidence") is not None else "-"), styles['Normal']),
-        ])
-    col_widths = [140, 70, 110, 60, 60, 55, 45]
-    table = Table(rows, repeatRows=1, colWidths=col_widths)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.darkblue),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,0), 9),
-        ('BOTTOMPADDING', (0,0), (-1,0), 8),
-        ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-        ('FONTSIZE', (0,1), (-1,-1), 7),
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,1), (-1,-1), 4),
-    ]))
-    story.append(table)
+    story.append(Paragraph(f"<b>Attendance Report - {report_type.title()}</b>", styles["Title"]))
+    story.append(Spacer(1, 0.15 * inch))
+
+    # Explicit white text markup for all seven dark-blue header labels.
+    headers = [
+        Paragraph('<font color="#FFFFFF"><b>Student Name</b></font>', compact_header),
+        Paragraph('<font color="#FFFFFF"><b>Roll No</b></font>', compact_header),
+        Paragraph('<font color="#FFFFFF"><b>Subject</b></font>', compact_header),
+        Paragraph('<font color="#FFFFFF"><b>Date</b></font>', compact_header),
+        Paragraph('<font color="#FFFFFF"><b>Time</b></font>', compact_header),
+        Paragraph('<font color="#FFFFFF"><b>Status</b></font>', compact_header),
+        Paragraph('<font color="#FFFFFF"><b>Confidence</b></font>', compact_header),
+    ]
+
+    if not data.get("records", []):
+        story.append(Paragraph("No attendance records found for the selected filters.", empty_msg))
+        story.append(Spacer(1, 0.15 * inch))
+    else:
+        rows = [headers]
+        for r in data["records"][:50]:
+            confidence = r.get("confidence")
+            if isinstance(confidence, (int, float)):
+                confidence_text = f"{confidence:.2f}%"
+            elif confidence is None:
+                confidence_text = "-"
+            else:
+                confidence_text = str(confidence)
+
+            rows.append([
+                Paragraph(str(r.get("student_name") or ""), compact_body),
+                Paragraph(str(r.get("roll_number") or ""), compact_body),
+                Paragraph(str(r.get("subject") or ""), compact_body),
+                Paragraph(str(r.get("date") or ""), compact_body),
+                Paragraph(str(r.get("time") or ""), compact_body),
+                Paragraph(str(r.get("status") or ""), compact_body),
+                Paragraph(confidence_text, compact_body),
+            ])
+
+        col_widths = [105, 90, 90, 65, 55, 55, 80]
+        assert sum(col_widths) == 540, f"Column widths sum to {sum(col_widths)}, expected 540"
+
+        table = Table(rows, repeatRows=1, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 9),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+            ("GRID", (0, 0), (-1, -1), 1, colors.darkgrey),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 1), (-1, -1), 7),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 2),
+        ]))
+        story.append(table)
+
     doc.build(story)
     buf.seek(0)
     return StreamingResponse(
@@ -210,3 +259,14 @@ def export_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=attendance_{report_type}.pdf"},
     )
+
+
+@router.get("/reports/export/pdf")
+def export_pdf(
+    report_type: str = Query("daily"),
+    subject_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.FACULTY)),
+):
+    data = attendance_report(report_type=report_type, subject_id=subject_id, db=db, user=user)
+    return _build_attendance_pdf(data, report_type)
