@@ -36,6 +36,7 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /smart-attendance-system/
+          VITE_API_URL: https://smart-attendance-system-daq6.onrender.com
       - name: Verify build output
         working-directory: frontend
         run: |
