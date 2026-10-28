@@ -182,7 +182,7 @@ def export_pdf(
             Paragraph(str(r.get("date") or ""), styles['Normal']),
             Paragraph(str(r.get("time") or ""), styles['Normal']),
             Paragraph(str(r.get("status") or ""), styles['Normal']),
-            Paragraph(str(r.get("confidence") if r.get("confidence") is not None else "-", styles['Normal'])),
+            Paragraph(str(r.get("confidence") if r.get("confidence") is not None else "-"), styles['Normal']),
         ])
     col_widths = [140, 70, 110, 60, 60, 55, 45]
     table = Table(rows, repeatRows=1, colWidths=col_widths)
