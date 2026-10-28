@@ -3,6 +3,8 @@ import { Download } from 'lucide-react';
 import { api, Subject } from '../api/client';
 
 export default function ReportsPage() {
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState('daily');
   const [subjectId, setSubjectId] = useState<number | ''>('');
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -13,6 +15,36 @@ export default function ReportsPage() {
   useEffect(() => {
     api.getReport(type, subjectId || undefined).then(r => setRecords(r.records));
   }, [type, subjectId]);
+
+  const handleDownload = async (format: 'csv' | 'excel' | 'pdf') => {
+    if (downloading) return;
+    setDownloading(true);
+    setError(null);
+    try {
+      const apiBase = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : '';
+      const url = (apiBase ? apiBase + '/api' : '/api') + `/reports/export/${format}?report_type=${encodeURIComponent(type)}${subjectId ? '&subject_id=' + encodeURIComponent(String(subjectId)) : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+        const msg = Array.isArray(err.detail) ? err.detail.map((d: { msg: string }) => d.msg).join(', ') : (err.detail || `Download failed (${res.status})`);
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const ext = format === 'excel' ? 'xlsx' : format;
+      const a = document.createElement('a');
+      const urlObj = URL.createObjectURL(blob);
+      a.href = urlObj;
+      a.download = `attendance-report-${type}-${subjectId || 'all'}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(urlObj), 100);
+    } catch (e: any) {
+      setError(e?.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -26,9 +58,10 @@ export default function ReportsPage() {
           <option value="">All Subjects</option>
           {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <a href={api.exportCsv(type)} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg"><Download size={16} /> CSV</a>
-        <a href={api.exportExcel(type)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg"><Download size={16} /> Excel</a>
-        <a href={api.exportPdf(type)} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg"><Download size={16} /> PDF</a>
+        {error && <div className="w-full text-red-600 text-sm font-medium">{error}</div>}
+        <button onClick={() => handleDownload('csv')} disabled={downloading} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50">{downloading ? 'Downloading…' : <><Download size={16} /> CSV</>}</button>
+        <button onClick={() => handleDownload('excel')} disabled={downloading} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50">{downloading ? 'Downloading…' : <><Download size={16} /> Excel</>}</button>
+        <button onClick={() => handleDownload('pdf')} disabled={downloading} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">{downloading ? 'Downloading…' : <><Download size={16} /> PDF</>}</button>
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-xl border overflow-x-auto">
         <table className="w-full text-sm">
