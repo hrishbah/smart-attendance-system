@@ -159,22 +159,51 @@ def export_pdf(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.FACULTY)),
 ):
     from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     data = attendance_report(report_type=report_type, subject_id=subject_id, db=db, user=user)
     buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=letter)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, 750, f"Attendance Report - {report_type.title()}")
-    c.setFont("Helvetica", 10)
-    y = 720
+    doc = SimpleDocTemplate(buf, pagesize=letter,
+                            rightMargin=0.5*inch, leftMargin=0.5*inch,
+                            topMargin=0.6*inch, bottomMargin=0.6*inch)
+    styles = getSampleStyleSheet()
+    story = []
+    story.append(Paragraph(f"<b>Attendance Report - {report_type.title()}</b>", styles['Title']))
+    story.append(Spacer(1, 0.15*inch))
+    headers = [Paragraph("<b>Student Name</b>", styles['Normal']), Paragraph("<b>Roll No</b>", styles['Normal']), Paragraph("<b>Subject</b>", styles['Normal']), Paragraph("<b>Date</b>", styles['Normal']), Paragraph("<b>Time</b>", styles['Normal']), Paragraph("<b>Status</b>", styles['Normal']), Paragraph("<b>Confidence</b>", styles['Normal'])]
+    rows = [headers]
     for r in data["records"][:50]:
-        line = f"{r['student_name']} | {r['roll_number']} | {r['subject']} | {r['date']} | {r['status']}"
-        c.drawString(50, y, line[:100])
-        y -= 15
-        if y < 50:
-            c.showPage()
-            y = 750
-    c.save()
+        rows.append([
+            Paragraph(str(r.get("student_name") or ""), styles['Normal']),
+            Paragraph(str(r.get("roll_number") or ""), styles['Normal']),
+            Paragraph(str(r.get("subject") or ""), styles['Normal']),
+            Paragraph(str(r.get("date") or ""), styles['Normal']),
+            Paragraph(str(r.get("time") or ""), styles['Normal']),
+            Paragraph(str(r.get("status") or ""), styles['Normal']),
+            Paragraph(str(r.get("confidence") if r.get("confidence") is not None else "-", styles['Normal'])),
+        ])
+    col_widths = [140, 70, 110, 60, 60, 55, 45]
+    table = Table(rows, repeatRows=1, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.darkblue),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 9),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 7),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 4),
+    ]))
+    story.append(table)
+    doc.build(story)
     buf.seek(0)
     return StreamingResponse(
         buf,
