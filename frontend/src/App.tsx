@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
@@ -21,8 +21,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const noApi = !import.meta.env.VITE_API_URL;
   return (
-    <Routes>
+    <>
+      {noApi && (
+        <div className="bg-amber-100 text-amber-900 text-center text-sm py-2 px-4 font-medium">
+          No VITE_API_URL configured — backend features (login, data, face) are unavailable on this static host.
+        </div>
+      )}
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/students" element={<ProtectedRoute><StudentsPage /></ProtectedRoute>} />
@@ -35,16 +42,17 @@ function AppRoutes() {
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>
+    </>
   );
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AuthProvider>
         <AppRoutes />
         <Toaster position="top-right" />
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
